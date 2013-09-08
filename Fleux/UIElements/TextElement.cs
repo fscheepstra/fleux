@@ -10,21 +10,49 @@
     {
         protected string text;
         protected bool needUpdate = true;
+        private bool _inRelayout;
 
         public TextElement(string text)
         {
             this.text = text;
             this.Style = MetroTheme.PhoneTextNormalStyle;
+            SizeChanged += delegate
+                {
+                    if (_inRelayout) return; // to avoid creating FleuxApplication.DummyDrawingGraphics
+                    DoRelayout(FleuxApplication.DummyDrawingGraphics);
+                };
         }
 
         public enum AutoSizeModeOptions
         {
-            None,
+            /// <summary>
+            /// Fixed size
+            /// </summary>
+            None, 
+            /// <summary>
+            /// Both height and width are calculated
+            /// </summary>
             OneLineAutoHeight,
+            /// <summary>
+            /// Auto height, fixed width
+            /// </summary>
+            OneLineAutoHeightFixedWidth,
+            /// <summary>
+            /// Wrap text over fixed width
+            /// </summary>
             WrapText,
         }
-
-        public AutoSizeModeOptions AutoSizeMode { get; set; }
+  
+        AutoSizeModeOptions _AutoSizeMode;
+        public AutoSizeModeOptions AutoSizeMode {
+            get{
+                return _AutoSizeMode;
+            }
+            set{
+                _AutoSizeMode = value;
+                DoRelayout(FleuxApplication.DummyDrawingGraphics);
+            }
+        }
 
         public string Text
         {
@@ -44,12 +72,14 @@
 
         public override void ResizeForWidth(int width)
         {
-            if (this.AutoSizeMode != AutoSizeModeOptions.None)
+            if (this.AutoSizeMode == AutoSizeModeOptions.WrapText ||
+                this.AutoSizeMode == AutoSizeModeOptions.OneLineAutoHeight ||
+                this.AutoSizeMode == AutoSizeModeOptions.OneLineAutoHeightFixedWidth)
             {
                 this.Size = new Size(width, 10); // Height will be calculated later
                 try
                 {
-                    this.Relayout(FleuxApplication.DummyDrawingGraphics);
+                    DoRelayout(FleuxApplication.DummyDrawingGraphics);
                 }
                 catch (Exception)
                 {
@@ -62,7 +92,7 @@
         {
             if (this.needUpdate)
             {
-                this.Relayout(drawingGraphics);
+                DoRelayout(drawingGraphics);
                 this.needUpdate = false;
             }
 
@@ -72,6 +102,7 @@
             {
                 case AutoSizeModeOptions.None:
                 case AutoSizeModeOptions.OneLineAutoHeight:
+                case AutoSizeModeOptions.OneLineAutoHeightFixedWidth:
                     drawingGraphics.DrawText(this.text);
                     break;
                 case AutoSizeModeOptions.WrapText:
@@ -80,23 +111,42 @@
             }
         }
 
+        private void DoRelayout(IDrawingGraphics drawingGraphics)
+        {
+            if (_inRelayout) return;
+
+            _inRelayout = true;
+            try
+            {
+                Relayout(drawingGraphics);
+            }
+            finally
+            {
+                _inRelayout = false;
+            }
+        }
+
         protected virtual void Relayout(IDrawingGraphics dg)
         {
             if (this.AutoSizeMode != AutoSizeModeOptions.None)
             {
-                var height = 0;
+                int height = 0;
                 switch (this.AutoSizeMode)
                 {
                     case AutoSizeModeOptions.OneLineAutoHeight:
-                        height = dg.Style(this.Style)
-                            .CalculateTextSize(this.text ?? "").Height;
+                        var sz = dg.Style(this.Style).CalculateTextSize(this.text ?? "");
+                        this.Size = new Size(sz.Width, sz.Height);
+                        break;
+                    case AutoSizeModeOptions.OneLineAutoHeightFixedWidth:
+                        height = dg.Style(this.Style).CalculateTextSize(this.text ?? "").Height;
+                        this.Size = new Size(this.Size.Width, height);
                         break;
                     case AutoSizeModeOptions.WrapText:
                         height = dg.Style(this.Style)
                             .CalculateMultilineTextHeight(this.text ?? "", this.Size.Width);
+                        this.Size = new Size(this.Size.Width, height);
                         break;
                 }
-                this.Size = new Size(this.Size.Width, height);
             }
         }
     }
