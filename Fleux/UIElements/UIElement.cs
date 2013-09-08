@@ -24,6 +24,7 @@
             // Default transformation parameters
             this.TransformationScaling = 1.0;
             this.TransformationCenter = new Point(0, 0);
+            Enabled = true;
         }
 
         public event EventHandler<SizeChangedEventArgs> SizeChanged;
@@ -34,6 +35,7 @@
         public bool PreTap = false;
 
         private Point location;
+        private bool _enabled;
 
         public Point Location
         {
@@ -47,7 +49,7 @@
                 {
                     Point location = this.location;
                     this.location = value;
-                    if (this.LocationChanged != null)
+                    if (this.LocationChanged != null && location != this.location)
                     {
                         this.LocationChanged(this, null);
                     }
@@ -75,6 +77,28 @@
                         this.SizeChanged(this, new SizeChangedEventArgs { New = value, Old = old });
                     }
                 }
+            }
+        }
+        
+        public int Width
+        {
+            get{
+                return Size.Width;
+            }
+            
+            set{
+                this.Size = new Size(value, Size.Height);
+            }
+        }
+
+        public int Height
+        {
+            get{
+                return Size.Height;
+            }
+            
+            set{
+                this.Size = new Size(Size.Width, value);
             }
         }
 
@@ -109,6 +133,20 @@
 
         public UIElement Parent { get; set; }
 
+        /// <summary>
+        /// Gets or sets boolean indicating whether the UIElememt can respond to user interaction.
+        /// </summary>
+        public bool Enabled
+        {
+            get { return _enabled; }
+            set
+            {
+                if (_enabled == value) return;
+                _enabled = value;
+                Update();
+            }
+        }
+
         public IEnumerable<UIElement> ChildrenEnumerable
         {
             get
@@ -122,6 +160,21 @@
         }
 
         public string ID { get; set; }
+
+        public bool Visible{ get
+            {
+                return Visibility == StateVisible;
+            }
+            set
+            {
+                Visibility = value ? StateVisible : StateHidden;
+            }
+        }
+
+        const int StateVisible = 0;
+        const int StateHidden = 1;
+        const int StateGone = 2;
+        public int Visibility { get; set; }
 
         public UIElement this[int idx]
         {
@@ -193,6 +246,11 @@
 
         public virtual bool Tap(Point p)
         {
+            if (!Enabled)
+            {
+                return false;
+            }
+
             bool handled = false;
             if (PreTap && this.TapHandler != null)
             {
@@ -210,6 +268,11 @@
 
         public virtual bool DoubleTap(Point p)
         {
+            if (!Enabled)
+            {
+                return false;
+            }
+
             bool handled = this.TraverseHandle(this.ApplyTransformation(p),
                                                el => el.DoubleTap(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
             if (!handled && this.DoubleTapHandler != null)
@@ -263,6 +326,8 @@
 
         public virtual UIElement Pressed(Point p)
         {
+            if (!Enabled) return null;
+
             UIElement handled = this.TraverseHandle(this.ApplyTransformation(p),
                                                el => el.Pressed(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
             if (handled == null && this.PressedHandler != null)
@@ -287,7 +352,7 @@
         protected virtual bool TraverseHandle(Point start, Func<UIElement, bool> elementHandler)
         {
             bool handled = false;
-            foreach (var el in this.Children.Where(x => x.Bounds.Contains(start)).Reverse())
+            foreach (var el in this.Children.Where(x => x.Visible && x.Bounds.Contains(start)).Reverse())
             {
                 if (elementHandler(el))
                 {
@@ -301,7 +366,7 @@
         protected virtual UIElement TraverseHandle(Point start, Func<UIElement, UIElement> elementHandler)
         {
             UIElement handled = null;
-            foreach (var el in this.Children.Where(x => x.Bounds.Contains(start)).Reverse())
+            foreach (var el in this.Children.Where(x => x.Visible && x.Bounds.Contains(start)).Reverse())
             {
                 handled = elementHandler(el);
                 if (handled != null)
@@ -310,6 +375,16 @@
                 }
             }
             return handled;
+        }
+
+        public void PutBelow(UIElement anchor)
+        {
+            PutBelow(anchor, 0);
+        }
+
+        public void PutBelow(UIElement anchor, int padding)
+        {
+            this.Location = new Point(anchor.Location.X, anchor.Location.Y + anchor.Size.Height + padding);
         }
 
         public void PutAtLeft(UIElement anchor)

@@ -25,10 +25,6 @@
             set { this.rows = value; }
         }
 
-        public int Width { get; set; }
-
-        public int Height { get; set; }
-
         public UIElement this[int row, int column]
         {
             set { this.Add(row, column, value); }
@@ -63,12 +59,13 @@
                 int y = this.Location.Y.ToPixels();
                 for (var row = 0; row < this.rows.Count(); row++)
                 {
-                    this.cells.Where(c => (c.Column == column) && (c.Row == row)).ToList()
-                        .ForEach(c =>
-                                     {
-                                         c.Content.Location = new Point(x, y);
-                                         c.Content.Size = new Size(this.Columns[column].Value, this.Rows[row].Value);
-                                     });
+                    this.cells.Where(c => (c.Column == column) && (c.Row == row)).ToList().ForEach(c =>
+                    {
+                        c.Content.Location = new Point(x, y);
+                        var cw = this.Columns.Skip(column).Take(c.ColumnSpan).Sum( (it) => it.Value );
+                        var ch = this.Rows.Skip(row).Take(c.RowSpan).Sum( (it) => it.Value );
+                        c.Content.Size = new Size(cw, ch);
+                    });
                     y += this.Rows[row].Value;
                 }
                 x += this.Columns[column].Value;

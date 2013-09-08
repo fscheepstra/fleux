@@ -75,10 +75,11 @@
                 {
                     count = nci.LedsCount;
                 }
-            }catch(Exception e){}
+            }catch(Exception){}
             return count;
         }
 
+        #pragma warning disable 0649
         private class LedSettingsInfo
         {
             public uint LedNum;

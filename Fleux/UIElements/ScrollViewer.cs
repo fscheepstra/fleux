@@ -29,7 +29,7 @@
             this.EntranceAnimation = new ForwarderAnimation(() => this.content.EntranceAnimation);
             this.ExitAnimation = new ForwarderAnimation(() => this.content.ExitAnimation);
             this.ScrollBarWidth = 5;
-            this.ScrollBarColor = Color.White;
+            this.ScrollBarColor = ScrollBarDefaultColor;
         }
 
         ~ScrollViewer()
@@ -94,6 +94,8 @@
         public bool ShowScrollbars { get; set; }
 
         public Color ScrollBarColor { get; set; }
+        
+        public static Color ScrollBarDefaultColor = Color.White;
 
         public int ScrollBarWidth { get; set; }
 
@@ -141,7 +143,7 @@
                     if (TopShadow == null)
                     {
                         TopShadow = new Bitmap(this.Size.Width.ToPixels(), drawingGraphics.CalculateHeight(ShadowHeight));
-                        BottomShadow = new Bitmap(this.Size.Width.ToPixels(), drawingGraphics.CalculateHeight(ShadowHeight));
+                        BottomShadow = new Bitmap(this.Size.Width.ToPixels(), drawingGraphics.CalculateHeight(ShadowHeight+1));
                     }
                     if (this.VerticalOffset < 0)
                     {
@@ -149,8 +151,8 @@
                     }
                     if (this.VerticalOffset > Math.Min(0, -this.Content.Size.Height + this.Size.Height))
                     {
-                        drawingGraphics.GetOpaqueClipBuffer(new Rectangle(0, this.Size.Height + 1 - ShadowHeight,
-                                                                          this.Size.Width, ShadowHeight), BottomShadow).Dispose();
+                        drawingGraphics.GetOpaqueClipBuffer(new Rectangle(0, this.Size.Height - ShadowHeight,
+                                                                          this.Size.Width, ShadowHeight+1), BottomShadow).Dispose();
                     }
                 }
                 
@@ -167,7 +169,7 @@
             {
                 if (this.VerticalOffset < 0)
                 {
-                    int cheight = 0;
+                    int cheight = - dg.CalculateHeight(Math.Max(ShadowHeight + this.VerticalOffset, 0));
                     for(int s = 0; s < ShadowSteps; s++)
                     {
                         drawingGraphics.Graphics.AlphaBlend(TopShadow,
@@ -194,6 +196,7 @@
         {
             drawingGr.DrawAlphaImage("verticalscrollbar.png", new Rectangle(this.Size.Width - this.ScrollBarWidth, 0, this.ScrollBarWidth, this.Size.Height));
             var scrollHeight = 0;
+            var scrollWidth = 0;
             var scrollBegin = 0;
             if (this.Content.Size.Height != 0)
             {
@@ -201,6 +204,16 @@
                 scrollBegin = this.Size.Height * -this.VerticalOffset / this.Content.Size.Height;
             }
             drawingGr.Color(this.ScrollBarColor).FillRectangle(new Rectangle(this.Size.Width - this.ScrollBarWidth, scrollBegin, this.ScrollBarWidth, scrollHeight));
+            
+            if (HorizontalScroll)
+            {
+                if (this.Content.Size.Width != 0)
+                {
+                    scrollWidth = Math.Max(this.Size.Width * this.Size.Width / this.Content.Size.Width, 20);
+                    scrollBegin = this.Size.Width * -this.HorizontalOffset / this.Content.Size.Width;
+                }
+                drawingGr.Color(this.ScrollBarColor).FillRectangle(new Rectangle(scrollBegin, this.Size.Height - this.ScrollBarWidth, scrollWidth, this.ScrollBarWidth));
+            }
         }
 
         public override bool Pan(Point from, Point to, bool done, Point startPoint)

@@ -9,8 +9,13 @@
 
     public class Canvas : UIElement
     {
+        public event Action ContentChanged;
+        
+        public bool AutoResize{ get; set; }
+
         public Canvas()
         {
+            AutoResize = true;
             this.EntranceAnimation = new ForwarderAnimation(() => new AnimationGroup(this.Children.Where(e => e.EntranceAnimation != null).Select(e => e.EntranceAnimation)));
             this.ExitAnimation = new ForwarderAnimation(() => new AnimationGroup(this.Children.Where(e => e.ExitAnimation != null).Select(e => e.ExitAnimation)));
         }
@@ -29,8 +34,10 @@
                 return;
             this.Children.Add(element);
             element.Parent = this;
-            this.Size = new Size(Math.Max(element.Bounds.Right, this.Size.Width), Math.Max(element.Bounds.Bottom, this.Size.Height));
+            if (AutoResize)
+                this.Size = new Size(Math.Max(element.Bounds.Right, this.Size.Width), Math.Max(element.Bounds.Bottom, this.Size.Height));
             element.Updated = this.Update;
+            if (ContentChanged != null) ContentChanged();
         }
 
         public virtual void RemoveElement(UIElement element)
@@ -44,6 +51,7 @@
             });
             */
             element.Updated = null;
+            if (ContentChanged != null) ContentChanged();
         }
 
         //Rectangle lastVisibleRect;
@@ -53,12 +61,21 @@
         {
             //if (lastVisibleRect != drawingGraphics.VisibleRect
             int ctime = System.Environment.TickCount;
-            var visible = this.Children.Where(i => i.Bounds.IntersectsWith(drawingGraphics.VisibleRect)).ToList();
+
+            var visible = this.Children.Where(i => i.Visible && i.Bounds.IntersectsWith(drawingGraphics.VisibleRect)).ToList();
+
             ctime = System.Environment.TickCount-ctime;
             drawtime += ctime;
             foreach(var e in visible)
             {
-                e.Draw(drawingGraphics.CreateChild(e.Location, e.TransformationScaling, e.TransformationCenter));
+                try{
+                    e.Draw(drawingGraphics.CreateChild(e.Location, e.TransformationScaling, e.TransformationCenter));
+#if xxxDEBUG
+                    drawingGraphics.DrawRectangle(e.Location.X, e.Location.Y, e.Size.Width, e.Size.Height);
+#endif
+                }catch(Exception){
+                    //TODO: handle UI exceptions somehow!
+                }
             };
         }
 
@@ -75,6 +92,7 @@
                 element.Parent = this;
                 base.Size = new Size(Math.Max(element.Bounds.Right, base.Size.Width), Math.Max(element.Bounds.Bottom, base.Size.Height));
                 element.Updated = new Action(this.Update);
+                if (ContentChanged != null) ContentChanged();
             }
         }
 
@@ -86,6 +104,7 @@
         public void Clear()
         {
             this.Children.Clear();
+            if (ContentChanged != null) ContentChanged();
         }
     }
 }

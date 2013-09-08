@@ -8,8 +8,25 @@
 
     public class StackPanel : Canvas
     {
+        
+        public int Padding{ get; set; }
+        
+        int columns = 1;
+        
+        public int Columns{
+            get{
+                return columns;
+            }
+            set{
+                columns = value;
+                Relayout();
+            }
+        }
+    
         public StackPanel()
         {
+            base.AutoResize = false;
+            this.Padding = 0;
             this.SizeChanged += (s, e) => this.Relayout();
         }
 
@@ -19,15 +36,24 @@
             this.Relayout();
         }
 
-        private void Relayout()
+        public void Relayout()
         {
             int y = 0;
+            int no = 0;
+            UIElement lastch = null;
             foreach (var i in this.Children)
             {
-                i.Location = new Point(0, y);
-                i.ResizeForWidth(this.Size.Width);
-                y += i.Size.Height;
+                var cwidth = this.Width/columns - Padding;
+                i.Location = new Point((no == 0 ? i.Location.X : 0) + cwidth*(no % columns) + Padding*(no % columns), y);
+                i.ResizeForWidth(cwidth);
+                
+                no = (no+1) % columns;
+                if (no % columns == 0)
+                    y += i.Size.Height + Padding;
+                lastch = i;
             }
+            if (lastch != null && lastch.Location.Y + lastch.Size.Height > this.Size.Height)
+                this.Height = lastch.Location.Y + lastch.Size.Height + Padding;
         }
     }
 }
