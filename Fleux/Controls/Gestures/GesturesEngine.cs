@@ -52,6 +52,9 @@
         private bool mouseDown;
         private Point prevDownPoint;
         private Timer holdTimer;
+        private bool CancelLastAction = false;
+        
+        public int LastTapDuration;
 
         public GesturesEngine()
         {
@@ -118,23 +121,29 @@
         public void MouseUp(Point point)
         {
             this.mouseDown = false;
-            var ellapsedFromMouseDown = Environment.TickCount - this.mouseDownTicks;
+            this.LastTapDuration = Environment.TickCount - this.mouseDownTicks;
             this.canBeHold = false;
             this.RaiseReleased(this.mouseDownPoint, point);
 
+            if (CancelLastAction)
+            {
+                CancelLastAction = false;
+                return;
+            }
+            
             // Check for tap or double tap
             if (this.canBeTap && this.mouseDownPoint.IsCloseTo(point, this.parameters.TapDistance)
-                && ellapsedFromMouseDown <= this.parameters.TapTimePeriod)
+                && LastTapDuration <= this.parameters.TapTimePeriod)
             {
                 this.RaiseTap(this.mouseDownPoint);
             }
-            else if (this.canBeHold && ellapsedFromMouseDown > this.parameters.TapTimePeriod)
+            else if (this.canBeHold && LastTapDuration > this.parameters.TapTimePeriod)
             {
                 this.RaiseHold();
             }
-            else if (ellapsedFromMouseDown <= this.parameters.FlickPeriod)
+            else if (LastTapDuration <= this.parameters.FlickPeriod)
             {
-                this.RaiseFlick(this.mouseDownPoint, point, ellapsedFromMouseDown);
+                this.RaiseFlick(this.mouseDownPoint, point, LastTapDuration);
             }
             else
             {
@@ -206,6 +215,11 @@
             {
                 this.Released.Invoke(start, end);
             }
+        }
+        
+        public void CancelCurrentAction()
+        {
+            this.CancelLastAction = true;
         }
     }
 }

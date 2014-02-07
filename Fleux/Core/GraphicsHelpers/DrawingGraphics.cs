@@ -114,7 +114,10 @@
         {
             // cail: wtf? useless clipping on high resolutions
             // cail: WTF2:
-            get { return new Rectangle(Math.Max(0, -this.Location.X.ToLogic()), Math.Max(0,-this.Location.Y.ToLogic()), MaxWidth.ToLogic(), MaxHeight.ToLogic()); }
+            get {
+                var vx = Math.Max(0, -this.Location.X.ToLogic());
+                return new Rectangle(vx, Math.Max(0,-this.Location.Y.ToLogic()), MaxWidth.ToLogic()-vx, MaxHeight.ToLogic());
+            }
         }
 
         public static DrawingGraphics FromGraphicsAndRect(Graphics gr, Image canvasImage, Rectangle rect)
@@ -189,7 +192,7 @@
             this.state.CurrentY = y;
             return this;
         }
-
+        
         public IDrawingGraphics MoveX(int x)
         {
             this.state.CurrentX = x;
@@ -603,12 +606,15 @@
 
         public IDrawingGraphics CreateChild(Point innerlocation, double scalingTransformation, Point transformationCenter)
         {
-            var location = innerlocation.ToPixels().ToParent(this.Location);
-            var children = DrawingGraphics.FromGraphicsLocationMaxWidth(this.Graphics, this.canvasImage, location.X, location.Y, this.MaxWidth - location.X);
-            children.scalingFactorFromParent = this.scalingFactorFromParent * this.scalingFactor;
-            children.scalingFactor = scalingTransformation;
-            children.TransformationCenter = transformationCenter;
-            return children;
+            var childLocation = innerlocation.ToPixels().ToParent(this.Location);
+            var childMaxWidth = this.MaxWidth - (childLocation.X - this.Location.X);
+            var child = FromGraphicsLocationMaxWidth(this.Graphics, this.canvasImage, childLocation.X, childLocation.Y, childMaxWidth);
+
+            child.scalingFactorFromParent = this.scalingFactorFromParent * this.scalingFactor;
+            child.scalingFactor = scalingTransformation;
+            child.TransformationCenter = transformationCenter;
+
+            return child;
         }
 
         public IDrawingGraphics CreateChild(Point innerlocation)

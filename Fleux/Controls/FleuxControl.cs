@@ -24,6 +24,8 @@
         private bool active;
         private UIElement pressedHandledBy;
 
+        public int LastTapDuration = 0;
+
         public FleuxControl()
         {
             this.EntranceDuration = 600;
@@ -147,7 +149,9 @@
         {
             if (this.pressedHandledBy != null)
             {
-                this.pressedHandledBy.Released();
+                var res = this.pressedHandledBy.Released();
+                if (res)
+                    gestures.CancelCurrentAction();
             }
         }
 
@@ -208,10 +212,13 @@
                 var gr = DrawingGraphics.FromGraphicsAndRect(this.offGr, this.offBmp, new Rectangle(0, 0, this.offBmp.Width, this.offBmp.Height));
                 try{
                     this.elements.ForEach(element => element.Draw(gr.CreateChild(element.Location, element.TransformationScaling, element.TransformationCenter)));
-                }catch(Exception){
-                  // TODO drawing exception because of
-                  //     System.InvalidOperationException: Collection was modified;
-                  // on elements
+                }catch(Exception ex){
+#if DEBUG
+	                  // TODO drawing exception because of
+	                  //     System.InvalidOperationException: Collection was modified;
+	                  // on elements
+					System.Console.WriteLine(ex.ToString());
+#endif
                 }
                 if (this.ShadowedAnimationMode != ShadowedAnimationOptions.None
                     && this.shadowImageX < this.offBmp.Width
@@ -295,6 +302,7 @@
         private void Hold(Point p)
         {
             var handled = false;
+            this.LastTapDuration = this.gestures.LastTapDuration;
             foreach (var el in this.elements.Where(e => e.Bounds.Contains(p)))
             {
                 if (el.Hold(p.ClientTo(el.Location)))
@@ -311,6 +319,7 @@
 
         private void Tap(Point p)
         {
+            this.LastTapDuration = this.gestures.LastTapDuration;
             this.Invoke(
                     new Action(() =>
                     {

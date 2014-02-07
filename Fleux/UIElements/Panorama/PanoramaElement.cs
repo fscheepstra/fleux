@@ -1,4 +1,6 @@
-﻿namespace Fleux.UIElements.Panorama
+﻿using Fleux.Core;
+
+namespace Fleux.UIElements.Panorama
 {
     using System;
     using System.Drawing;
@@ -16,6 +18,12 @@
         protected bool isPanning;
         protected int currentSectionIndex;
 
+        public static int defaultDefaultScrollDuration = 600;
+        public static int MinimumScrollDuration = 200;
+        public int defaultScrollDuration = defaultDefaultScrollDuration;
+        protected int scrollDuration;
+        protected bool variableSpeedFlick = false;
+
         public bool IsPanoramaAnimating{ get; protected set; }
         public static bool RubberEdgesDefault = true;
         public bool RubberEdges{ get; set; }
@@ -25,7 +33,7 @@
             this.RubberEdges = RubberEdgesDefault;
             this.Background = new Canvas();
             this.Title = new Canvas();
-            this.Sections = new Canvas { Location = new Point(0, 130), Size = new Size(1800, 600) };
+            this.Sections = new Canvas { Location = new Point(0, 130), Size = new Size(1800, 600), ID = "PanoramaSections" };
             this.AddElement(this.Background);
             this.AddElement(this.Title);
             this.AddElement(this.Sections);
@@ -74,7 +82,7 @@
                 {
                     this.currentSectionIndex = value;
                 }
-                this.IsPanoramaAnimating = true;
+                this.IsPanoramaAnimating = FleuxSettings.GlobalAnimating = true;
                 // var vv = this.currentSectionIndex * this.sectionSpace;
                 var atype = (RubberEdges && (FinePosition < 0 || FinePosition > (this.Sections.ChildrenCount-1)*this.SectionSpace)) ?
                                FunctionBasedAnimation.Functions.BounceEntranceSin : FunctionBasedAnimation.Functions.SoftedFluid;
@@ -83,10 +91,11 @@
                     {
                         From = this.finePosition,
                         To = this.currentSectionIndex * this.sectionSpace,
-                        Duration = 400,
+                        Duration = variableSpeedFlick ? scrollDuration : defaultScrollDuration,
                         OnAnimation = v => { this.FinePosition = v; this.Update(); }
                     }
                 );
+                variableSpeedFlick = false;
                 
                 // TODO!
                 // TODO - moveout into OnAnimationEnd!
@@ -134,6 +143,10 @@
             }
             if (!base.Flick(from, to, millisecs, startPoint) && (Math.Abs(to.X - from.X) > Math.Abs(to.Y - from.Y)))
             {
+                scrollDuration = Math.Max(MinimumScrollDuration,
+                                          defaultScrollDuration * millisecs /
+                                          Fleux.Controls.Gestures.GestureDetectionParameters.Current.FlickPeriod);
+                variableSpeedFlick = true;
                 this.CurrentSectionIndex += -Math.Sign(to.X - from.X);
             }
             else if (this.isPanning)
@@ -163,7 +176,10 @@
             if (!base.Pan(from, to, done, startPoint))
             {
                 this.isPanning = !done;
-                this.IsPanoramaAnimating = !done;
+
+                if (!done) {
+                    FleuxSettings.GlobalAnimating = this.IsPanoramaAnimating = true;
+                }
 
                 // Validate if should we handle this Pan
                 if (Math.Abs(to.X - from.X) > Math.Abs(to.Y - from.Y))
@@ -245,15 +261,8 @@
             this.animation = animation;
             sb.CancelAsyncAnimate();
             sb.Clear();
-            sb.AddAnimations(this.animation,
-                // hack? implement it better?
-                new CommitStoryboardAnimation(){
-                    StartsAt = 400,
-                    Duration = 500,
-                    CommitAction = () => { this.IsPanoramaAnimating = false; }
-                }
-            );
-            sb.BeginAnimate();
+            sb.AddAnimation(this.animation);
+            sb.BeginAnimate(() => { FleuxSettings.GlobalAnimating = this.IsPanoramaAnimating = false; });
         }
     }
 }

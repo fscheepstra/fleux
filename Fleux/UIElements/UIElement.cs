@@ -117,6 +117,11 @@
 
         public Action Updated { get; set; }
 
+        /// <summary>
+        /// If true, then this element will consume all the unhandled input, and will not pass it to the parent.
+        /// </summary>
+        public bool ConsumeAllInput { get; set; }
+
         public Func<Point, bool> TapHandler { get; set; }
 
         public Func<Point, bool> DoubleTapHandler { get; set; }
@@ -129,7 +134,11 @@
 
         public Func<Point, UIElement> PressedHandler { get; set; }
 
-        public Action ReleasedHandler { get; set; }
+        /// <summary>
+        /// Indicates the mouse released event
+        /// In case handler returns true, all other highlevel events are cancelled
+        /// </summary>
+        public Func<bool> ReleasedHandler { get; set; }
 
         public UIElement Parent { get; set; }
 
@@ -161,14 +170,10 @@
 
         public string ID { get; set; }
 
-        public bool Visible{ get
-            {
-                return Visibility == StateVisible;
-            }
-            set
-            {
-                Visibility = value ? StateVisible : StateHidden;
-            }
+        public bool Visible
+        {
+            get { return Visibility == StateVisible; }
+            set { Visibility = value ? StateVisible : StateHidden; }
         }
 
         const int StateVisible = 0;
@@ -201,7 +206,7 @@
                         this.Update();
                         return this;
                     };
-                    this.ReleasedHandler = () => { this.TransformationScaling = 1.0; this.Update(); };
+                    this.ReleasedHandler = () => { this.TransformationScaling = 1.0; this.Update(); return false; };
                 }
                 else
                 {
@@ -216,14 +221,7 @@
         {
             if (this.Parent != null)
             {
-                if (child.Bounds.IntersectsWith(new Rectangle(0, 0, this.Size.Width, this.Size.Height)))
-                {
-                    return this.Parent.IsShowing(this);
-                }
-                else
-                {
-                    return false;
-                }
+                return child.Bounds.IntersectsWith(new Rectangle(0, 0, this.Size.Width, this.Size.Height)) && this.Parent.IsShowing(this);
             }
             else
             {
@@ -259,6 +257,7 @@
             }
             handled = this.TraverseHandle(this.ApplyTransformation(p),
                                                 el => el.Tap(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
+            handled |= ConsumeAllInput;
             if (!handled && !PreTap && this.TapHandler != null)
             {
                 handled = this.TapHandler(this.ApplyTransformation(p));
@@ -275,6 +274,7 @@
 
             bool handled = this.TraverseHandle(this.ApplyTransformation(p),
                                                el => el.DoubleTap(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
+            handled |= ConsumeAllInput;
             if (!handled && this.DoubleTapHandler != null)
             {
                 handled = this.DoubleTapHandler(this.ApplyTransformation(p));
@@ -286,6 +286,7 @@
         {
             bool handled = this.TraverseHandle(this.ApplyTransformation(p),
                                                el => el.Hold(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
+            handled |= ConsumeAllInput;
             if (!handled && this.HoldHandler != null)
             {
                 handled = this.HoldHandler(this.ApplyTransformation(p));
@@ -300,6 +301,7 @@
                                                                this.ApplyTransformation(to).ClientTo(this.ApplyTransformation(el.Location)),
                                                                millisecs,
                                                                this.ApplyTransformation(startPoint).ClientTo(this.ApplyTransformation(el.Location))));
+            handled |= ConsumeAllInput;
             if (!handled && this.FlickHandler != null)
             {
                 handled = this.FlickHandler(this.ApplyTransformation(from),
@@ -317,6 +319,7 @@
                                                             this.ApplyTransformation(to).ClientTo(this.ApplyTransformation(el.Location)),
                                                             done,
                                                             this.ApplyTransformation(startPoint).ClientTo(this.ApplyTransformation(el.Location))));
+            handled |= ConsumeAllInput;
             if (!handled && this.PanHandler != null)
             {
                 handled = this.PanHandler(this.ApplyTransformation(from), this.ApplyTransformation(to), done, this.ApplyTransformation(startPoint));
@@ -328,21 +331,26 @@
         {
             if (!Enabled) return null;
 
-            UIElement handled = this.TraverseHandle(this.ApplyTransformation(p),
+            UIElement pressTarget = this.TraverseHandle(this.ApplyTransformation(p),
                                                el => el.Pressed(this.ApplyTransformation(p).ClientTo(this.ApplyTransformation(el.Location))));
-            if (handled == null && this.PressedHandler != null)
+            if (pressTarget == null && this.PressedHandler != null)
             {
-                handled = this.PressedHandler(this.ApplyTransformation(p));
+                pressTarget = this.PressedHandler(this.ApplyTransformation(p));
             }
-            return handled;
+            if (ConsumeAllInput && pressTarget == null)
+                pressTarget = this;
+            return pressTarget;
         }
 
-        public virtual void Released()
+        public virtual bool Released()
         {
+            if (!Enabled) return false;
+            
             if (this.ReleasedHandler != null)
             {
-                this.ReleasedHandler();
+                return this.ReleasedHandler();
             }
+            return false;
         }
 
         public virtual void ResizeForWidth(int width)
